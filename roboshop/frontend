@@ -1,0 +1,2 @@
+- name: install fronend app for roboshop project
+  vars_

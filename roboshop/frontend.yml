@@ -1,0 +1,62 @@
+---
+- name: Deploy RoboShop Frontend Service
+  hosts: frontend
+  become: yes
+  gather_facts: yes
+  vars_prompt:
+    - name: "frontend_version"
+      prompt: "Enter the frontend version (default: v3)"
+      default: "v3"
+      private: no
+
+  tasks:
+    - name: Install Nginx Web Server
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+        enablerepo: "nginx:1.24"
+      notify: Start and Enable Nginx
+
+    - name: Remove default Nginx content
+      ansible.builtin.file:
+        path: /usr/share/nginx/html
+        state: directory
+        recurse: yes
+        mode: '0755'
+      notify: Restart Nginx
+
+    - name: Download frontend content
+      ansible.builtin.get_url:
+        url: "https://roboshop-artifacts.s3.amazonaws.com/frontend-{{ frontend_version }}.zip"
+        dest: /tmp/frontend.zip
+      notify: Extract and Deploy Frontend
+
+    - name: Configure Nginx Reverse Proxy
+      ansible.builtin.template:
+        src: nginx.conf
+        dest: /etc/nginx/nginx.conf
+      notify: Restart Nginx
+
+  handlers:
+    - name: Start and Enable Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Restart Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+
+    - name: Extract and Deploy Frontend
+      ansible.builtin.unarchive:
+        src: /tmp/frontend.zip
+        dest: /usr/share/nginx/html/
+        remote_src: yes
+      notify: Restart Nginx
+
+    - name: Restart Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
